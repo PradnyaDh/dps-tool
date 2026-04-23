@@ -1,0 +1,15 @@
+# Credentials — never commit these
+.env
+
+# Generated outputs
+snapshots/
+state.json
+logs/
+*.md
+dashboard_notes.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
