@@ -5,8 +5,9 @@
 snapshots/
 state.json
 logs/
-*.md
 dashboard_notes.json
+# Markdown reports (but not README)
+open_action_items_*.md
 
 # Python
 __pycache__/
