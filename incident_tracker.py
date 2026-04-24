@@ -22,6 +22,18 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
+# Auto-load .env from the project directory (no need to `source .env` manually)
+_env_file = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(_env_file):
+    with open(_env_file) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _key, _, _val = _line.partition('=')
+                _key = _key.removeprefix('export').strip()
+                _val = _val.strip().strip('"').strip("'")
+                os.environ.setdefault(_key, _val)
+
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
 # Confluence session cookie — set via .env or: export CONF_COOKIE="cloud.session.token=eyJ..."

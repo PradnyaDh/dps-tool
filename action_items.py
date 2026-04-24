@@ -270,17 +270,26 @@ def build_slack_summary(date_from, date_to, svc_summaries, grand_total, incident
 
 # ─── SNAPSHOT ────────────────────────────────────────────────────────────────
 
-def save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count):
+def save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count,
+                  grand_completed=0, svc_completed_counts=None, snapshot_date=None):
     """Save a dated JSON snapshot for dashboard week-over-week tracking."""
     os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+    svc_completed_counts = svc_completed_counts or {}
+    snap_date = snapshot_date if snapshot_date else datetime.now().strftime('%Y-%m-%d')
     snapshot = {
-        "date": datetime.now().strftime('%Y-%m-%d'),
+        "date": snap_date,
         "from_date": date_from.strftime('%Y-%m-%d'),
         "to_date": date_to.strftime('%Y-%m-%d'),
         "total_open": grand_total,
+        "total_completed": grand_completed,
+        "total_items": grand_total + grand_completed,
         "incident_count": incident_count,
         "by_service": {
-            svc: {"incident_count": ni, "item_count": nc}
+            svc: {
+                "incident_count": ni,
+                "item_count": nc,
+                "completed_count": svc_completed_counts.get(svc, 0),
+            }
             for svc, ni, nc in svc_summaries
         },
         "incidents": [
@@ -291,9 +300,10 @@ def save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_tota
                 "pm_status": pm_status,
                 "date": (d := extract_incident_date(title)) and d.strftime('%Y-%m-%d'),
                 "items": items,
+                "completed_count": inc_completed,
             }
             for service, open_blocks in svc_open_blocks.items()
-            for title, pid, pm_status, items in open_blocks
+            for title, pid, pm_status, items, inc_completed in open_blocks
         ],
     }
     out = os.path.join(SNAPSHOTS_DIR, f"{snapshot['date']}.json")
@@ -304,7 +314,7 @@ def save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_tota
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 
-def run(date_from, date_to, write_doc=True):
+def run(date_from, date_to, write_doc=True, snapshot_date=None):
     from_str = date_from.strftime('%Y-%m-%d')
     to_str = date_to.strftime('%Y-%m-%d')
     print(f"Searching Confluence ({from_str} → {to_str})...")
@@ -357,28 +367,37 @@ def run(date_from, date_to, write_doc=True):
     lines.append("=" * 70)
 
     grand_total = 0
+    grand_completed = 0
     incident_count = 0
     svc_summaries = []
 
     svc_open_blocks = {}
+    svc_completed_counts = {}
     for service, incidents in all_results.items():
         open_blocks = []
+        svc_completed = 0
         for p in incidents:
             if p.get('skip'):
                 continue
             raw = [i for i in p['items'] if not any(n in i.lower() for n in TEMPLATE_NOISE)]
             enriched = enrich_items(raw)
             real = [i for i in enriched if is_real_action_item(i)]
-            open_items = [i for i in real if classify_item(i) == 'open']
+            classified = [(i, classify_item(i)) for i in real]
+            open_items = [i for i, c in classified if c == 'open']
+            inc_completed = sum(1 for i, c in classified if c == 'completed')
+            svc_completed += inc_completed
             if open_items:
-                open_blocks.append((p['title'], p['id'], p['pm_status'], open_items))
+                open_blocks.append((p['title'], p['id'], p['pm_status'], open_items, inc_completed))
         svc_open_blocks[service] = open_blocks
+        svc_completed_counts[service] = svc_completed
         count = sum(len(b[3]) for b in open_blocks)
         grand_total += count
+        grand_completed += svc_completed
         incident_count += len(open_blocks)
         svc_summaries.append((service, len(open_blocks), count))
 
-    save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count)
+    save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count,
+                  grand_completed, svc_completed_counts, snapshot_date=snapshot_date)
 
     lines.append("SUMMARY")
     lines.append("=" * 70)
@@ -400,7 +419,7 @@ def run(date_from, date_to, write_doc=True):
         lines.append("=" * 70)
         lines.append(f"{service.upper()}  —  {count} items across {len(open_blocks)} incidents")
         lines.append("=" * 70)
-        for title, pid, pm_status, items in open_blocks:
+        for title, pid, pm_status, items, *_ in open_blocks:
             link = f"{PAGE_BASE}/{pid}"
             inc_date = extract_incident_date(title)
             date_str = inc_date.strftime('%Y-%m-%d') if inc_date else 'date unknown'
@@ -475,7 +494,7 @@ def build_markdown(date_from, date_to, svc_open_blocks, svc_summaries, grand_tot
         md.append(f"")
         md.append(f"## {service}  —  {count} items across {len(open_blocks)} incidents")
         md.append(f"")
-        for title, pid, pm_status, items in open_blocks:
+        for title, pid, pm_status, items, *_ in open_blocks:
             link = f"{PAGE_BASE}/{pid}"
             inc_date = extract_incident_date(title)
             date_str = inc_date.strftime('%Y-%m-%d') if inc_date else 'date unknown'
@@ -531,28 +550,36 @@ def run_and_collect(date_from, date_to):
             p['items'] = extract_followup_action_items(html)
 
     svc_open_blocks = {}
+    svc_completed_counts = {}
     svc_summaries = []
     grand_total = 0
+    grand_completed = 0
     incident_count = 0
 
     for service, incidents in all_results.items():
         open_blocks = []
+        svc_completed = 0
         for p in incidents:
             if p.get('skip'):
                 continue
             raw = [i for i in p['items'] if not any(n in i.lower() for n in TEMPLATE_NOISE)]
             enriched = enrich_items(raw)
             real = [i for i in enriched if is_real_action_item(i)]
-            open_items = [i for i in real if classify_item(i) == 'open']
+            classified = [(i, classify_item(i)) for i in real]
+            open_items = [i for i, c in classified if c == 'open']
+            inc_completed = sum(1 for i, c in classified if c == 'completed')
+            svc_completed += inc_completed
             if open_items:
-                open_blocks.append((p['title'], p['id'], p['pm_status'], open_items))
+                open_blocks.append((p['title'], p['id'], p['pm_status'], open_items, inc_completed))
         svc_open_blocks[service] = open_blocks
+        svc_completed_counts[service] = svc_completed
         count = sum(len(b[3]) for b in open_blocks)
         grand_total += count
+        grand_completed += svc_completed
         incident_count += len(open_blocks)
         svc_summaries.append((service, len(open_blocks), count))
 
-    return svc_open_blocks, svc_summaries, grand_total, incident_count
+    return svc_open_blocks, svc_summaries, grand_total, incident_count, grand_completed, svc_completed_counts
 
 
 if __name__ == "__main__":
@@ -561,6 +588,7 @@ if __name__ == "__main__":
     parser.add_argument('--to', dest='date_to', default=datetime.now().strftime('%Y-%m-%d'), help='End date YYYY-MM-DD')
     parser.add_argument('--no-doc', action='store_true', help='Skip Google Doc creation')
     parser.add_argument('--md', action='store_true', help='Write markdown file')
+    parser.add_argument('--snapshot-date', dest='snapshot_date', default=None, help='Override snapshot filename date YYYY-MM-DD')
     args = parser.parse_args()
     date_from = datetime.strptime(args.date_from, '%Y-%m-%d')
     date_to = datetime.strptime(args.date_to, '%Y-%m-%d')
@@ -570,8 +598,9 @@ if __name__ == "__main__":
         to_str = date_to.strftime('%Y-%m-%d')
         print(f"Searching Confluence ({from_str} → {to_str})...")
         print(f"Found incidents. Fetching content and checking Jira ticket statuses...")
-        svc_open_blocks, svc_summaries, grand_total, incident_count = run_and_collect(date_from, date_to)
-        save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count)
+        svc_open_blocks, svc_summaries, grand_total, incident_count, grand_completed, svc_completed_counts = run_and_collect(date_from, date_to)
+        save_snapshot(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count,
+                      grand_completed, svc_completed_counts, snapshot_date=args.snapshot_date)
         md_text = build_markdown(date_from, date_to, svc_open_blocks, svc_summaries, grand_total, incident_count)
         out_file = os.path.join(os.path.dirname(__file__), f"open_action_items_{date_from.strftime('%Y-%m-%d')}_to_{date_to.strftime('%Y-%m-%d')}.md")
         with open(out_file, 'w') as f:
@@ -583,4 +612,5 @@ if __name__ == "__main__":
             date_from=date_from,
             date_to=date_to,
             write_doc=not args.no_doc,
+            snapshot_date=args.snapshot_date,
         )
