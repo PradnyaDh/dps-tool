@@ -173,7 +173,31 @@ def enrich_items(items):
 
 def is_real_action_item(item):
     il = item.lower().strip()
+    # Incident metadata prefixes — not action items
     if re.search(r'^(status changed|affected component|time to detect|time to acknowledge|time to mitigate|time to graduate|time to verify|time to close|\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', il):
+        return False
+    # Incident summary/context fields
+    if re.search(r'^(scope:|duration:|impact:|severity:|region:|country:|service:|summary:|description:)', il):
+        return False
+    # Negative impact statements ("No customer impact", "No orders affected")
+    if re.search(r'^no (customer|order|user|impact|service|delivery)', il):
+        return False
+    # Past-tense incident descriptions — describe what happened, not what to do
+    if re.search(r'\b(experienced|was (affected|impacted|unavailable|degraded|observed)|resulted in|caused by|handled by|fallback (mechanism|service) (handled|was used))\b', il):
+        return False
+    # Completed past actions — describes what was already done, not future work
+    if re.search(r'\bwas (conducted|changed|deployed|updated|completed|fixed|resolved|used during the incident)\b', il):
+        return False
+    # Factual/descriptive state — not actionable
+    if re.search(r'\bis present[\s:]', il):
+        return False
+    if re.search(r'\b(has a fallback service|doesn\'t have a fallback|does not have a fallback)\b', il):
+        return False
+    # Short section/subsection headers — no Jira ticket and no imperative verb
+    imperative_verbs = r'^(add|fix|investigate|update|create|improve|introduce|review|evaluate|implement|deploy|migrate|establish|conduct|define|align|avoid|announce|rename|deprecate|strengthen|terminate|increase|consider|begin|allow|analyze|expand|ensure|integrate|enable|move|change|make|set|run|use|check|test|validate|monitor|configure|document|discuss|schedule|plan|prioritize)'
+    if (len(item.strip()) < 30
+            and not re.search(r'[A-Z][A-Z0-9]+-\d+', item)
+            and not re.search(imperative_verbs, il)):
         return False
     if 'do not update' in il or 'incident bot' in il or 'out of sync' in il:
         return False

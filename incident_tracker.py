@@ -116,6 +116,10 @@ TEMPLATE_NOISE = [
     'add missing squad', 'no action items', 'these issues must be',
     'to reduce likelihood', 'to reduce impact', 'to reduce recovery',
     'mid- and longterm', 'immediate action', 'select jira issues',
+    # Table headers / data labels
+    'in eur by country', 'estimated known unpaid',
+    # Past workarounds taken during incident (not future action items)
+    'temporarily to stabilize',
 ]
 
 # ─── JIRA HELPERS ────────────────────────────────────────────────────────────
