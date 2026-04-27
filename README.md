@@ -1,20 +1,27 @@
-# Incident Action Item Tracker
+# DPS Tool
 
-A tool that scans Confluence postmortems, extracts open follow-up action items, cross-checks Jira ticket status, and surfaces them in a weekly report, interactive dashboard, and Slack summary.
-
-Built for **Logistics Customer** services at Delivery Hero — but designed to be adopted by any team with postmortems in Confluence.
+Pricing team internal tooling for Delivery Hero — covering incident action item tracking and PR AI adoption analysis across the logistics dynamic pricing repos.
 
 ---
 
-## What It Does
+## Tools
 
-- Searches Confluence for postmortems matching your service keywords
-- Extracts **mid/long-term** action items only (immediate mitigation steps are excluded)
-- Looks up referenced Jira tickets and drops items whose tickets are already Done/Rejected/Closed
-- Handles the Confluence postmortem structure: parent labels with Jira sub-bullets are resolved as a group — if all tickets are done, the whole group is dropped
-- Groups open items by service and incident, with links to the postmortem
+### PR AI Adoption Dashboard
+
+Analyses PRs across the pricing repositories and classifies each as **AI-Generated**, **AI-Assisted**, or **Manual** based on Git co-author trailers and commit message signals.
+
+- Detects Claude, Gemini, GitHub Copilot, Amazon Q, Aider, HeroGen, Devin, Roo Code, Cursor, Tabnine, Cody
+- Distinguishes formal attribution (machine-generated email trailers → AI-Generated) from informal mentions (keyword in commit message → AI-Assisted)
+- Self-contained browser dashboard — no server required, open the HTML file directly
+- Covers `logistics-dynamic-pricing-api`, `logistics-dynamic-pricing`, `logistics-dynamic-pricing-dashboard` from Jan 2026
+
+### Incident Action Item Tracker
+
+Scans Confluence postmortems, extracts open follow-up action items, cross-checks Jira ticket status, and surfaces them in a weekly report and interactive dashboard.
+
+- Extracts **mid/long-term** action items only (immediate mitigation steps excluded)
+- Drops items whose Jira tickets are already Done/Rejected/Closed
 - Saves weekly snapshots for trend tracking
-- Serves an interactive Streamlit dashboard to review, search, filter, and mark items
 - Sends a Slack summary (webhook or bot token)
 - Exports to Google Doc or Markdown
 
@@ -24,24 +31,64 @@ Built for **Logistics Customer** services at Delivery Hero — but designed to b
 
 | Script | Purpose | Run |
 |--------|---------|-----|
+| `fetch_pr_data.py` | Fetch PR data from pricing repos via `gh` CLI, output to `/tmp/pr_dashboard_data.json` | `python3 fetch_pr_data.py` |
+| `pr_ai_dashboard.html` | Self-contained browser dashboard — open directly in any browser | open `pr_ai_dashboard.html` |
+| `pr_ai_dashboard.py` | Streamlit version of the PR AI adoption dashboard | `python3 -m streamlit run pr_ai_dashboard.py` |
 | `incident_tracker.py` | Weekly scanner — all action items, new incident detection, Google Doc | `python3 incident_tracker.py` |
 | `action_items.py` | On-demand — mid/long-term open items, date-filtered, snapshot saved | `python3 action_items.py [--from] [--to] [--no-doc\|--md]` |
-| `dashboard.py` | Interactive Streamlit dashboard | `python3 -m streamlit run dashboard.py` |
+| `dashboard.py` | Incident action items Streamlit dashboard | `python3 -m streamlit run dashboard.py` |
 | `slack_notify.py` | Send a Slack message (webhook or token) | `python3 slack_notify.py "message"` |
 
 ---
 
 ## Quick Start
 
-### 1. Clone and install dependencies
+### PR AI Adoption Dashboard
+
+#### 1. Prerequisites
 
 ```bash
-git clone https://github.com/PradnyaDh/incident-tracker
-cd incident-tracker
+# GitHub CLI — needed to fetch PR data
+brew install gh
+gh auth login
+
+pip install pandas plotly streamlit
+```
+
+#### 2. Fetch PR data
+
+```bash
+python3 fetch_pr_data.py
+# Outputs: /tmp/pr_dashboard_data.json
+```
+
+#### 3. View the dashboard
+
+```bash
+# Option A — open directly in browser (no server needed)
+open pr_ai_dashboard.html
+
+# Option B — Streamlit version
+python3 -m streamlit run pr_ai_dashboard.py
+```
+
+#### Refreshing data
+
+Re-run `fetch_pr_data.py` whenever you want fresh data, then reload the HTML or restart Streamlit. The HTML has data embedded at build time; re-running the script and reopening the file picks up the latest.
+
+---
+
+### Incident Action Item Tracker
+
+#### 1. Clone and install dependencies
+
+```bash
+git clone https://github.com/PradnyaDh/dps-tool
+cd dps-tool
 pip install google-auth google-api-python-client streamlit pandas plotly
 ```
 
-### 2. Set up credentials
+#### 2. Set up credentials
 
 ```bash
 cp .env.example .env
@@ -70,7 +117,7 @@ gcloud auth application-default login \
 gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 ```
 
-### 3. Run
+#### 3. Run
 
 ```bash
 # Pull open action items for this year, print to terminal
@@ -222,10 +269,13 @@ pip install google-auth google-api-python-client streamlit pandas plotly
 ## File Structure
 
 ```
-incident-tracker/
+dps-tool/
+├── fetch_pr_data.py        # Fetches PRs from GitHub, outputs /tmp/pr_dashboard_data.json
+├── pr_ai_dashboard.html    # Self-contained browser dashboard (open directly)
+├── pr_ai_dashboard.py      # Streamlit version of the PR AI adoption dashboard
 ├── incident_tracker.py     # Weekly scanner + Google Doc report
 ├── action_items.py         # On-demand follow-up item analysis
-├── dashboard.py            # Streamlit dashboard
+├── dashboard.py            # Incident action items Streamlit dashboard
 ├── slack_notify.py         # Slack notification helper
 ├── .env.example            # Credentials template
 ├── .env                    # Your credentials (gitignored)
