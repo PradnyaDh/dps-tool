@@ -1,13 +1,8 @@
-# Credentials — never commit these
+# Credentials
 .env
 
 # Generated outputs
-snapshots/
-state.json
-logs/
-dashboard_notes.json
-# Markdown reports (but not README)
-open_action_items_*.md
+/tmp/pr_dashboard_data.json
 
 # Python
 __pycache__/
