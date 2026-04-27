@@ -210,6 +210,14 @@
   <!-- TAB: TIMELINE -->
   <div id="tab-timeline" class="tab-panel">
     <div class="card">
+      <h3>AI Adoption % — Month over Month</h3>
+      <div class="chart-wrap"><canvas id="chart-timeline-pct"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Month-over-Month Change</h3>
+      <div id="mom-table-wrap"></div>
+    </div>
+    <div class="card">
       <h3>AI-Generated PRs Over Time</h3>
       <div class="chart-wrap"><canvas id="chart-timeline-ai"></canvas></div>
     </div>
@@ -531,14 +539,94 @@ function renderAuthors(df) {
 function renderTimeline(df) {
   const months = [...new Set(DATA.map(r=>r.month))].sort();
 
-  // AI tool over time
+  // Build monthly stats (always over ALL data for MoM, filtered for charts)
+  const statsByMonth = {};
+  months.forEach(m => statsByMonth[m] = {total:0, aiGen:0, aiAss:0, manual:0});
+  df.forEach(r => {
+    if (!statsByMonth[r.month]) return;
+    statsByMonth[r.month].total++;
+    if (r.category === "AI-Generated") statsByMonth[r.month].aiGen++;
+    else if (r.category === "AI-Assisted") statsByMonth[r.month].aiAss++;
+    else statsByMonth[r.month].manual++;
+  });
+  const aiPct = m => {
+    const s = statsByMonth[m];
+    return s.total ? ((s.aiGen + s.aiAss) / s.total * 100) : 0;
+  };
+
+  // ── AI% trend line ────────────────────────────────────────────────────────
+  destroyChart("timeline-pct");
+  charts["timeline-pct"] = new Chart(document.getElementById("chart-timeline-pct"), {
+    type: "line",
+    data: {
+      labels: months,
+      datasets: [{
+        label: "AI Adoption %",
+        data: months.map(m => parseFloat(aiPct(m).toFixed(1))),
+        borderColor: "#d61f26",
+        backgroundColor: "rgba(214,31,38,0.08)",
+        pointBackgroundColor: "#d61f26",
+        pointRadius: 5,
+        fill: true,
+        tension: 0.3,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks:{color:"#83828a"}, grid:{color:"#e8e9ec"} },
+        y: { min:0, max:100, ticks:{color:"#83828a", callback: v=>v+"%"}, grid:{color:"#e8e9ec"} },
+      },
+    },
+  });
+
+  // ── Month-over-Month table ────────────────────────────────────────────────
+  const rows = months.map((m, i) => {
+    const s = statsByMonth[m];
+    const pct = aiPct(m);
+    const prev = i > 0 ? statsByMonth[months[i-1]] : null;
+    const prevPct = i > 0 ? aiPct(months[i-1]) : null;
+    const deltaPct  = prevPct !== null ? (pct - prevPct) : null;
+    const deltaGen  = prev !== null ? (s.aiGen - prev.aiGen) : null;
+    const deltaAss  = prev !== null ? (s.aiAss - prev.aiAss) : null;
+    const deltaTotal= prev !== null ? (s.total  - prev.total) : null;
+
+    const fmt = (v, unit="") => v === null ? "—"
+      : (v >= 0 ? `<span style="color:#27ae60">▲ ${Math.abs(v).toFixed(unit?1:0)}${unit}</span>`
+                : `<span style="color:#e74c3c">▼ ${Math.abs(v).toFixed(unit?1:0)}${unit}</span>`);
+
+    return `<tr>
+      <td><strong>${m}</strong></td>
+      <td>${s.total}</td>
+      <td>${s.aiGen}</td>
+      <td>${s.aiAss}</td>
+      <td>${s.manual}</td>
+      <td><strong>${pct.toFixed(1)}%</strong></td>
+      <td>${fmt(deltaPct, "pp")}</td>
+      <td>${fmt(deltaTotal)}</td>
+      <td>${fmt(deltaGen)}</td>
+      <td>${fmt(deltaAss)}</td>
+    </tr>`;
+  });
+
+  document.getElementById("mom-table-wrap").innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Month</th><th>Total PRs</th><th>AI-Gen</th><th>AI-Assisted</th><th>Manual</th>
+        <th>AI %</th><th>Δ AI %</th><th>Δ Total</th><th>Δ AI-Gen</th><th>Δ Assisted</th>
+      </tr></thead>
+      <tbody>${rows.join("")}</tbody>
+    </table></div>`;
+
+  // ── AI tool over time ─────────────────────────────────────────────────────
   destroyChart("timeline-ai");
   const toolsByMonth = {};
   df.filter(r=>r.category==="AI-Generated").forEach(r => {
     if (!toolsByMonth[r.month]) toolsByMonth[r.month] = {};
     toolsByMonth[r.month][r.tool] = (toolsByMonth[r.month][r.tool]||0)+1;
   });
-  const tools = ["Claude","Gemini","Claude + Gemini"];
+  const tools = ["Claude","Gemini","Claude + Gemini","Herogen-Agent"];
   charts["timeline-ai"] = new Chart(document.getElementById("chart-timeline-ai"), {
     type: "bar",
     data: {
@@ -553,13 +641,8 @@ function renderTimeline(df) {
     options: { ...chartDefaults, plugins:{legend:{labels:{color:"#343b46"}}}, scales:{ x:{stacked:true,ticks:{color:"#83828a"},grid:{color:"#e8e9ec"}}, y:{stacked:true,ticks:{color:"#83828a"},grid:{color:"#e8e9ec"}} } },
   });
 
-  // Monthly volume by category
+  // ── Monthly volume by category ────────────────────────────────────────────
   destroyChart("timeline-cat");
-  const catByMonth = {};
-  df.forEach(r => {
-    if (!catByMonth[r.month]) catByMonth[r.month] = {};
-    catByMonth[r.month][r.category] = (catByMonth[r.month][r.category]||0)+1;
-  });
   const cats = ["AI-Generated","AI-Assisted","Manual"];
   charts["timeline-cat"] = new Chart(document.getElementById("chart-timeline-cat"), {
     type: "bar",
@@ -567,7 +650,7 @@ function renderTimeline(df) {
       labels: months,
       datasets: cats.map(c => ({
         label: c,
-        data: months.map(m => (catByMonth[m]||{})[c]||0),
+        data: months.map(m => (statsByMonth[m]||{})[c === "AI-Generated" ? "aiGen" : c === "AI-Assisted" ? "aiAss" : "manual"]||0),
         backgroundColor: CAT_COLORS[c],
         borderRadius: 3,
       })),
