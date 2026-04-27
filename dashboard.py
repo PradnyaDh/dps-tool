@@ -521,7 +521,7 @@ with tab_table:
             use_container_width=True,
             height=600,
         )
-        csv = df.drop(columns=['Postmortem']).to_csv(index=False)
+        csv = df.to_csv(index=False)
         st.download_button(
             "⬇ Download as CSV",
             data=csv,
