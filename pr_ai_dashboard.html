@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pricing Team — PR AI Adoption</title>
+<title>Pricing Team — AI Adoption</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -147,7 +147,7 @@
 
 <!-- MAIN -->
 <main class="main">
-  <h1>Pricing Team — PR AI Adoption</h1>
+  <h1>Pricing Team — AI Adoption</h1>
   <p class="subtitle">Jan 2026 → Apr 2026 · logistics-dynamic-pricing-{api, admin, dashboard} · Co-author trailers + commit message signals</p>
 
   <!-- METRICS -->
@@ -210,20 +210,24 @@
   <!-- TAB: TIMELINE -->
   <div id="tab-timeline" class="tab-panel">
     <div class="card">
-      <h3>AI Adoption % — Month over Month</h3>
-      <div class="chart-wrap"><canvas id="chart-timeline-pct"></canvas></div>
+      <div class="grid-3">
+        <div>
+          <h3>AI Adoption % Trend</h3>
+          <div class="chart-wrap-sm"><canvas id="chart-timeline-pct"></canvas></div>
+        </div>
+        <div>
+          <h3>AI-Generated PRs by Tool</h3>
+          <div class="chart-wrap-sm"><canvas id="chart-timeline-ai"></canvas></div>
+        </div>
+        <div>
+          <h3>Monthly Volume by Category</h3>
+          <div class="chart-wrap-sm"><canvas id="chart-timeline-cat"></canvas></div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <h3>Month-over-Month Change</h3>
       <div id="mom-table-wrap"></div>
-    </div>
-    <div class="card">
-      <h3>AI-Generated PRs Over Time</h3>
-      <div class="chart-wrap"><canvas id="chart-timeline-ai"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>Monthly PR Volume by Category</h3>
-      <div class="chart-wrap"><canvas id="chart-timeline-cat"></canvas></div>
     </div>
   </div>
 
