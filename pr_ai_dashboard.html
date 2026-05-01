@@ -281,14 +281,20 @@
       <h3>Avg Hours to Release — Month over Month by Repo</h3>
       <div class="chart-wrap"><canvas id="chart-release-mom"></canvas></div>
     </div>
-    <div class="grid-2">
-      <div class="card">
-        <h3>Avg Days to Merge — AI vs Non-AI</h3>
-        <div class="chart-wrap"><canvas id="chart-merge-mom-cat"></canvas></div>
+    <div class="card">
+      <h3>Avg Days to Merge — AI vs Non-AI by Repo</h3>
+      <div class="grid-3" style="gap:16px">
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-core</div><canvas id="chart-merge-cat-core"></canvas></div>
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-api</div><canvas id="chart-merge-cat-api"></canvas></div>
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-dashboard</div><canvas id="chart-merge-cat-dash"></canvas></div>
       </div>
-      <div class="card">
-        <h3>Avg Hours to Release — AI vs Non-AI</h3>
-        <div class="chart-wrap"><canvas id="chart-release-mom-cat"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Avg Hours to Release — AI vs Non-AI by Repo</h3>
+      <div class="grid-3" style="gap:16px">
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-core</div><canvas id="chart-release-cat-core"></canvas></div>
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-api</div><canvas id="chart-release-cat-api"></canvas></div>
+        <div><div style="font-size:0.8rem;color:var(--mid);margin-bottom:6px;text-align:center">lp-dashboard</div><canvas id="chart-release-cat-dash"></canvas></div>
       </div>
     </div>
     <div class="card">
@@ -946,51 +952,55 @@ function renderPrMetrics() {
     }
   });
 
-  // ── MoM: avg days to merge — AI (combined) vs Non-AI ────────────────────
-  const aiVsNonAiSeries = [
-    { label: "AI (Generated + Assisted)", color: "#d61f26", filter: d => d.category !== "Manual" },
-    { label: "Non-AI (Manual)",           color: "#adb5bd", filter: d => d.category === "Manual" }
+  // ── MoM: AI vs Non-AI per repo ───────────────────────────────────────────
+  const AI_COLOR    = "#d61f26";
+  const NONAI_COLOR = "#adb5bd";
+  const AI_SERIES = [
+    { label: "AI",     color: AI_COLOR,    filter: d => d.category !== "Manual" },
+    { label: "Non-AI", color: NONAI_COLOR, filter: d => d.category === "Manual"  }
   ];
-
-  const mergeMomCatDatasets = aiVsNonAiSeries.map(s => ({
-    label: s.label,
-    data: allMonths.map(mo => {
-      const sub = METRICS_DATA.filter(d => s.filter(d) && d.mergedAt.startsWith(mo));
-      return sub.length ? +(sub.reduce((a,d)=>a+d.days_open,0)/sub.length).toFixed(1) : null;
-    }),
-    borderColor: s.color, backgroundColor: s.color+"33",
-    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
-  }));
-
-  if (window._chartMergeMomCat) window._chartMergeMomCat.destroy();
-  window._chartMergeMomCat = new Chart(document.getElementById("chart-merge-mom-cat"), {
-    type: "line",
-    data: { labels: allMonths, datasets: mergeMomCatDatasets },
-    options: {
-      plugins: { legend: { position:"top" } },
-      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Days" } } }
-    }
+  const REPO_CHART_MAP = [
+    { repo: "logistics-dynamic-pricing",           mergeId: "chart-merge-cat-core",  releaseId: "chart-release-cat-core"  },
+    { repo: "logistics-dynamic-pricing-api",       mergeId: "chart-merge-cat-api",   releaseId: "chart-release-cat-api"   },
+    { repo: "logistics-dynamic-pricing-dashboard", mergeId: "chart-merge-cat-dash",  releaseId: "chart-release-cat-dash"  },
+  ];
+  const chartOpts = (yLabel) => ({
+    plugins: { legend: { position:"top", labels:{ boxWidth:10, font:{ size:10 } } } },
+    scales: { y: { beginAtZero:true, title:{ display:true, text:yLabel } },
+              x: { ticks:{ font:{ size:9 } } } }
   });
 
-  // ── MoM: avg hrs to release — AI (combined) vs Non-AI ────────────────────
-  const releaseMomCatDatasets = aiVsNonAiSeries.map(s => ({
-    label: s.label,
-    data: allMonths.map(mo => {
-      const sub = METRICS_DATA.filter(d => s.filter(d) && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
-      return sub.length ? +(sub.reduce((a,d)=>a+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
-    }),
-    borderColor: s.color, backgroundColor: s.color+"33",
-    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
-  }));
+  if (!window._repoCatCharts) window._repoCatCharts = {};
+  REPO_CHART_MAP.forEach(({ repo, mergeId, releaseId }) => {
+    // Days to merge
+    const mergeDS = AI_SERIES.map(s => ({
+      label: s.label,
+      data: allMonths.map(mo => {
+        const sub = METRICS_DATA.filter(d => d.repo===repo && s.filter(d) && d.mergedAt.startsWith(mo));
+        return sub.length ? +(sub.reduce((a,d)=>a+d.days_open,0)/sub.length).toFixed(1) : null;
+      }),
+      borderColor: s.color, backgroundColor: s.color+"33",
+      tension: 0.3, fill: false, pointRadius: 3, spanGaps: true
+    }));
+    if (window._repoCatCharts[mergeId]) window._repoCatCharts[mergeId].destroy();
+    window._repoCatCharts[mergeId] = new Chart(document.getElementById(mergeId), {
+      type:"line", data:{ labels:allMonths, datasets:mergeDS }, options:chartOpts("Days")
+    });
 
-  if (window._chartReleaseMomCat) window._chartReleaseMomCat.destroy();
-  window._chartReleaseMomCat = new Chart(document.getElementById("chart-release-mom-cat"), {
-    type: "line",
-    data: { labels: allMonths, datasets: releaseMomCatDatasets },
-    options: {
-      plugins: { legend: { position:"top" } },
-      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Hours" } } }
-    }
+    // Hrs to release
+    const releaseDS = AI_SERIES.map(s => ({
+      label: s.label,
+      data: allMonths.map(mo => {
+        const sub = METRICS_DATA.filter(d => d.repo===repo && s.filter(d) && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
+        return sub.length ? +(sub.reduce((a,d)=>a+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
+      }),
+      borderColor: s.color, backgroundColor: s.color+"33",
+      tension: 0.3, fill: false, pointRadius: 3, spanGaps: true
+    }));
+    if (window._repoCatCharts[releaseId]) window._repoCatCharts[releaseId].destroy();
+    window._repoCatCharts[releaseId] = new Chart(document.getElementById(releaseId), {
+      type:"line", data:{ labels:allMonths, datasets:releaseDS }, options:chartOpts("Hours")
+    });
   });
 
   // ── Top commented table ───────────────────────────────────────────────────
