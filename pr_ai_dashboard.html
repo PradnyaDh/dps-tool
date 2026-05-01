@@ -281,6 +281,16 @@
       <h3>Avg Hours to Release — Month over Month by Repo</h3>
       <div class="chart-wrap"><canvas id="chart-release-mom"></canvas></div>
     </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Avg Days to Merge — MoM by AI Category</h3>
+        <div class="chart-wrap"><canvas id="chart-merge-mom-cat"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Avg Hours to Release — MoM by AI Category</h3>
+        <div class="chart-wrap"><canvas id="chart-release-mom-cat"></canvas></div>
+      </div>
+    </div>
     <div class="card">
       <h3>Top Commented PRs <span style="font-weight:400;font-size:0.8rem;color:var(--mid)">(human comments only, bots excluded)</span></h3>
       <div class="tbl-wrap"><table id="pm-comments-table"></table></div>
@@ -930,6 +940,57 @@ function renderPrMetrics() {
   window._chartReleaseMom = new Chart(document.getElementById("chart-release-mom"), {
     type: "line",
     data: { labels: allMonths, datasets: releaseMomDatasets },
+    options: {
+      plugins: { legend: { position:"top" } },
+      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Hours" } } }
+    }
+  });
+
+  // ── MoM: avg days to merge by AI category ────────────────────────────────
+  const CAT_LINE_COLORS = {
+    "AI-Generated": "#2ecc71",
+    "AI-Assisted":  "#f39c12",
+    "Manual":       "#adb5bd"
+  };
+  const CATS_MOM = ["AI-Generated","AI-Assisted","Manual"];
+
+  const mergeMomCatDatasets = CATS_MOM.map(cat => ({
+    label: cat,
+    data: allMonths.map(mo => {
+      const sub = METRICS_DATA.filter(d => d.category===cat && d.mergedAt.startsWith(mo));
+      return sub.length ? +(sub.reduce((s,d)=>s+d.days_open,0)/sub.length).toFixed(1) : null;
+    }),
+    borderColor: CAT_LINE_COLORS[cat],
+    backgroundColor: CAT_LINE_COLORS[cat]+"33",
+    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
+  }));
+
+  if (window._chartMergeMomCat) window._chartMergeMomCat.destroy();
+  window._chartMergeMomCat = new Chart(document.getElementById("chart-merge-mom-cat"), {
+    type: "line",
+    data: { labels: allMonths, datasets: mergeMomCatDatasets },
+    options: {
+      plugins: { legend: { position:"top" } },
+      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Days" } } }
+    }
+  });
+
+  // ── MoM: avg hrs to release by AI category ────────────────────────────────
+  const releaseMomCatDatasets = CATS_MOM.map(cat => ({
+    label: cat,
+    data: allMonths.map(mo => {
+      const sub = METRICS_DATA.filter(d => d.category===cat && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
+      return sub.length ? +(sub.reduce((s,d)=>s+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
+    }),
+    borderColor: CAT_LINE_COLORS[cat],
+    backgroundColor: CAT_LINE_COLORS[cat]+"33",
+    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
+  }));
+
+  if (window._chartReleaseMomCat) window._chartReleaseMomCat.destroy();
+  window._chartReleaseMomCat = new Chart(document.getElementById("chart-release-mom-cat"), {
+    type: "line",
+    data: { labels: allMonths, datasets: releaseMomCatDatasets },
     options: {
       plugins: { legend: { position:"top" } },
       scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Hours" } } }
