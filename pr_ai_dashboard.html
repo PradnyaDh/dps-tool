@@ -274,6 +274,14 @@
       </div>
     </div>
     <div class="card">
+      <h3>Avg Days to Merge — Month over Month by Repo</h3>
+      <div class="chart-wrap"><canvas id="chart-merge-mom"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Avg Hours to Release — Month over Month by Repo</h3>
+      <div class="chart-wrap"><canvas id="chart-release-mom"></canvas></div>
+    </div>
+    <div class="card">
       <h3>Top Commented PRs <span style="font-weight:400;font-size:0.8rem;color:var(--mid)">(human comments only, bots excluded)</span></h3>
       <div class="tbl-wrap"><table id="pm-comments-table"></table></div>
     </div>
@@ -871,6 +879,61 @@ function renderPrMetrics() {
       ]
     },
     options:{ plugins:{legend:{position:"top"}}, scales:{y:{beginAtZero:true,max:100,title:{display:true,text:"%"}}} }
+  });
+
+
+  // ── MoM: avg days to merge by repo ───────────────────────────────────────
+  const REPOS_MOM = [
+    "logistics-dynamic-pricing",
+    "logistics-dynamic-pricing-api",
+    "logistics-dynamic-pricing-dashboard"
+  ];
+  const REPO_COLORS = { "logistics-dynamic-pricing":"#4285F4", "logistics-dynamic-pricing-api":"#f39c12", "logistics-dynamic-pricing-dashboard":"#d61f26" };
+
+  // Collect all months present in data
+  const allMonths = [...new Set(METRICS_DATA.map(d => d.mergedAt.slice(0,7)))].sort();
+
+  const mergeMomDatasets = REPOS_MOM.map(repo => ({
+    label: REPO_SHORT[repo],
+    data: allMonths.map(mo => {
+      const sub = METRICS_DATA.filter(d => d.repo===repo && d.mergedAt.startsWith(mo));
+      return sub.length ? +(sub.reduce((s,d)=>s+d.days_open,0)/sub.length).toFixed(1) : null;
+    }),
+    borderColor: REPO_COLORS[repo],
+    backgroundColor: REPO_COLORS[repo]+"33",
+    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
+  }));
+
+  if (window._chartMergeMom) window._chartMergeMom.destroy();
+  window._chartMergeMom = new Chart(document.getElementById("chart-merge-mom"), {
+    type: "line",
+    data: { labels: allMonths, datasets: mergeMomDatasets },
+    options: {
+      plugins: { legend: { position:"top" } },
+      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Days" } } }
+    }
+  });
+
+  // ── MoM: avg hrs to release by repo ──────────────────────────────────────
+  const releaseMomDatasets = REPOS_MOM.map(repo => ({
+    label: REPO_SHORT[repo],
+    data: allMonths.map(mo => {
+      const sub = METRICS_DATA.filter(d => d.repo===repo && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
+      return sub.length ? +(sub.reduce((s,d)=>s+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
+    }),
+    borderColor: REPO_COLORS[repo],
+    backgroundColor: REPO_COLORS[repo]+"33",
+    tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
+  }));
+
+  if (window._chartReleaseMom) window._chartReleaseMom.destroy();
+  window._chartReleaseMom = new Chart(document.getElementById("chart-release-mom"), {
+    type: "line",
+    data: { labels: allMonths, datasets: releaseMomDatasets },
+    options: {
+      plugins: { legend: { position:"top" } },
+      scales: { y: { beginAtZero: true, title: { display:true, text:"Avg Hours" } } }
+    }
   });
 
   // ── Top commented table ───────────────────────────────────────────────────
