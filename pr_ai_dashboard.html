@@ -283,11 +283,11 @@
     </div>
     <div class="grid-2">
       <div class="card">
-        <h3>Avg Days to Merge — MoM by AI Category</h3>
+        <h3>Avg Days to Merge — AI vs Non-AI</h3>
         <div class="chart-wrap"><canvas id="chart-merge-mom-cat"></canvas></div>
       </div>
       <div class="card">
-        <h3>Avg Hours to Release — MoM by AI Category</h3>
+        <h3>Avg Hours to Release — AI vs Non-AI</h3>
         <div class="chart-wrap"><canvas id="chart-release-mom-cat"></canvas></div>
       </div>
     </div>
@@ -946,22 +946,19 @@ function renderPrMetrics() {
     }
   });
 
-  // ── MoM: avg days to merge by AI category ────────────────────────────────
-  const CAT_LINE_COLORS = {
-    "AI-Generated": "#2ecc71",
-    "AI-Assisted":  "#f39c12",
-    "Manual":       "#adb5bd"
-  };
-  const CATS_MOM = ["AI-Generated","AI-Assisted","Manual"];
+  // ── MoM: avg days to merge — AI (combined) vs Non-AI ────────────────────
+  const aiVsNonAiSeries = [
+    { label: "AI (Generated + Assisted)", color: "#d61f26", filter: d => d.category !== "Manual" },
+    { label: "Non-AI (Manual)",           color: "#adb5bd", filter: d => d.category === "Manual" }
+  ];
 
-  const mergeMomCatDatasets = CATS_MOM.map(cat => ({
-    label: cat,
+  const mergeMomCatDatasets = aiVsNonAiSeries.map(s => ({
+    label: s.label,
     data: allMonths.map(mo => {
-      const sub = METRICS_DATA.filter(d => d.category===cat && d.mergedAt.startsWith(mo));
-      return sub.length ? +(sub.reduce((s,d)=>s+d.days_open,0)/sub.length).toFixed(1) : null;
+      const sub = METRICS_DATA.filter(d => s.filter(d) && d.mergedAt.startsWith(mo));
+      return sub.length ? +(sub.reduce((a,d)=>a+d.days_open,0)/sub.length).toFixed(1) : null;
     }),
-    borderColor: CAT_LINE_COLORS[cat],
-    backgroundColor: CAT_LINE_COLORS[cat]+"33",
+    borderColor: s.color, backgroundColor: s.color+"33",
     tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
   }));
 
@@ -975,15 +972,14 @@ function renderPrMetrics() {
     }
   });
 
-  // ── MoM: avg hrs to release by AI category ────────────────────────────────
-  const releaseMomCatDatasets = CATS_MOM.map(cat => ({
-    label: cat,
+  // ── MoM: avg hrs to release — AI (combined) vs Non-AI ────────────────────
+  const releaseMomCatDatasets = aiVsNonAiSeries.map(s => ({
+    label: s.label,
     data: allMonths.map(mo => {
-      const sub = METRICS_DATA.filter(d => d.category===cat && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
-      return sub.length ? +(sub.reduce((s,d)=>s+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
+      const sub = METRICS_DATA.filter(d => s.filter(d) && d.mergedAt.startsWith(mo) && d.hrs_to_release!==null);
+      return sub.length ? +(sub.reduce((a,d)=>a+d.hrs_to_release,0)/sub.length).toFixed(1) : null;
     }),
-    borderColor: CAT_LINE_COLORS[cat],
-    backgroundColor: CAT_LINE_COLORS[cat]+"33",
+    borderColor: s.color, backgroundColor: s.color+"33",
     tension: 0.3, fill: false, pointRadius: 4, spanGaps: true
   }));
 
